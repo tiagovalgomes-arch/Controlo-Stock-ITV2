@@ -1,0 +1,5 @@
+{
+  "name": "IT Stock Pro",
+  "description": "Aplicação profissional de gestão de inventário IT com controlo de entradas, saídas, alertas de stock mínimo e sugestões de compra assistidas por IA.",
+  "requestFramePermissions": []
+}
