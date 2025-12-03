@@ -1,15 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { ItemStock, TipoMovimento } from '../types';
-import { CATEGORIAS_OPTIONS } from '../constants';
-import { ArrowDownLeft, ArrowUpRight, CheckCircle2, Search, PlusCircle, MapPin, AlertTriangle } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, CheckCircle2, Search, PlusCircle, MapPin, AlertTriangle, Settings, Plus, Trash2, X, FileText } from 'lucide-react';
 
 interface StockMovementProps {
   items: ItemStock[];
+  categories: string[];
   onMovement: (itemId: string, type: TipoMovimento, quantity: number, reason: string) => void;
   onAddItem: (item: Omit<ItemStock, 'id' | 'ultimaAtualizacao'>, motivo?: string) => void;
+  onAddCategory: (category: string) => void;
+  onRemoveCategory: (category: string) => void;
 }
 
-export const StockMovement: React.FC<StockMovementProps> = ({ items, onMovement, onAddItem }) => {
+export const StockMovement: React.FC<StockMovementProps> = ({ items, categories, onMovement, onAddItem, onAddCategory, onRemoveCategory }) => {
   const [activeTab, setActiveTab] = useState<'ENTRADA' | 'SAIDA'>('ENTRADA');
   
   // Input States
@@ -21,9 +23,14 @@ export const StockMovement: React.FC<StockMovementProps> = ({ items, onMovement,
   const [reason, setReason] = useState<string>('');
   
   // New Item States (only for ENTRADA)
-  const [newItemCategory, setNewItemCategory] = useState<string>(CATEGORIAS_OPTIONS[0]);
+  const [newItemCategory, setNewItemCategory] = useState<string>(categories[0] || 'Geral');
   const [newItemLocation, setNewItemLocation] = useState('');
   const [newItemMinStock, setNewItemMinStock] = useState(5);
+  const [newItemRef, setNewItemRef] = useState('');
+
+  // Category Management State
+  const [showCatManager, setShowCatManager] = useState(false);
+  const [newCatName, setNewCatName] = useState('');
 
   const [successMsg, setSuccessMsg] = useState('');
 
@@ -34,6 +41,13 @@ export const StockMovement: React.FC<StockMovementProps> = ({ items, onMovement,
     setQuantity(1);
     setReason('');
   }, [activeTab]);
+
+  // Update default category if list changes
+  useEffect(() => {
+    if (categories.length > 0 && !categories.includes(newItemCategory)) {
+      setNewItemCategory(categories[0]);
+    }
+  }, [categories, newItemCategory]);
 
   // Check if input matches an existing item exactly
   useEffect(() => {
@@ -59,10 +73,11 @@ export const StockMovement: React.FC<StockMovementProps> = ({ items, onMovement,
       onAddItem({
         nome: itemNameInput,
         categoria: newItemCategory,
-        quantidade: quantity, // Initialize with the input quantity
+        quantidade: quantity,
         stockMinimo: newItemMinStock,
-        localizacao: newItemLocation
-      }, reason || 'Entrada Inicial (Novo Item)'); // Pass the reason from the form
+        localizacao: newItemLocation,
+        referencia: newItemRef
+      }, reason || 'Entrada Inicial (Novo Item)');
 
       setSuccessMsg(`Novo item criado: ${itemNameInput} (+${quantity})`);
     } else {
@@ -78,12 +93,23 @@ export const StockMovement: React.FC<StockMovementProps> = ({ items, onMovement,
     setQuantity(1);
     setReason('');
     setNewItemLocation('');
+    setNewItemRef('');
     setTimeout(() => setSuccessMsg(''), 3000);
+  };
+
+  const handleAddCategorySubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newCatName.trim()) {
+      onAddCategory(newCatName.trim());
+      setNewCatName('');
+    }
   };
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
-      <h2 className="text-2xl font-bold text-slate-800">Registo de Movimentos</h2>
+      <div className="flex justify-between items-center">
+         <h2 className="text-2xl font-bold text-slate-800">Registo de Movimentos</h2>
+      </div>
 
       {/* Tabs */}
       <div className="flex bg-white p-1 rounded-xl shadow-sm border border-slate-200">
@@ -110,6 +136,47 @@ export const StockMovement: React.FC<StockMovementProps> = ({ items, onMovement,
           <span>Dar Saída</span>
         </button>
       </div>
+
+      {/* Category Manager Toggle (Only in Entrada) */}
+      {activeTab === 'ENTRADA' && (
+         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            <button 
+              onClick={() => setShowCatManager(!showCatManager)}
+              className="w-full flex items-center justify-between px-6 py-3 text-slate-600 hover:bg-slate-50 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                 <Settings size={18} />
+                 <span className="font-medium text-sm">Gerir Categorias</span>
+              </div>
+              <span className="text-xs text-slate-400">{showCatManager ? 'Fechar' : 'Expandir'}</span>
+            </button>
+            
+            {showCatManager && (
+              <div className="p-6 pt-0 bg-slate-50 border-t border-slate-100">
+                 <div className="flex flex-wrap gap-2 mb-4">
+                    {categories.map(cat => (
+                      <span key={cat} className="inline-flex items-center gap-1 bg-white border border-slate-200 px-2 py-1 rounded-full text-xs text-slate-700">
+                        {cat}
+                        <button onClick={() => onRemoveCategory(cat)} className="text-slate-400 hover:text-red-600 rounded-full hover:bg-red-50 p-0.5"><X size={12} /></button>
+                      </span>
+                    ))}
+                 </div>
+                 <form onSubmit={handleAddCategorySubmit} className="flex gap-2">
+                    <input 
+                      type="text" 
+                      value={newCatName}
+                      onChange={e => setNewCatName(e.target.value)}
+                      placeholder="Nova categoria..." 
+                      className="flex-1 px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                    <button type="submit" className="bg-slate-800 text-white px-3 py-2 rounded-lg hover:bg-slate-700 text-sm font-medium">
+                       Adicionar
+                    </button>
+                 </form>
+              </div>
+            )}
+         </div>
+      )}
 
       <div className={`p-8 rounded-xl shadow-sm border border-slate-200 relative overflow-hidden bg-white`}>
         {activeTab === 'ENTRADA' && <div className="absolute top-0 left-0 w-2 h-full bg-green-500"></div>}
@@ -179,8 +246,18 @@ export const StockMovement: React.FC<StockMovementProps> = ({ items, onMovement,
                     onChange={(e) => setNewItemCategory(e.target.value)}
                     className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:ring-blue-500"
                   >
-                    {CATEGORIAS_OPTIONS.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                    {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                   </select>
+               </div>
+               <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Stock Mínimo</label>
+                  <input 
+                    type="number"
+                    min="0"
+                    value={newItemMinStock}
+                    onChange={(e) => setNewItemMinStock(parseInt(e.target.value))}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:ring-blue-500"
+                  />
                </div>
                <div>
                   <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Localização</label>
@@ -196,14 +273,17 @@ export const StockMovement: React.FC<StockMovementProps> = ({ items, onMovement,
                   </div>
                </div>
                <div>
-                  <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Stock Mínimo</label>
-                  <input 
-                    type="number"
-                    min="0"
-                    value={newItemMinStock}
-                    onChange={(e) => setNewItemMinStock(parseInt(e.target.value))}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:ring-blue-500"
-                  />
+                  <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Referência (Fixo)</label>
+                  <div className="relative">
+                    <FileText className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                    <input 
+                      type="text"
+                      value={newItemRef}
+                      onChange={(e) => setNewItemRef(e.target.value)}
+                      placeholder="Ex: S/N, Modelo"
+                      className="w-full pl-7 pr-3 py-2 border border-slate-300 rounded-md text-sm focus:ring-blue-500"
+                    />
+                  </div>
                </div>
             </div>
           )}
@@ -223,7 +303,7 @@ export const StockMovement: React.FC<StockMovementProps> = ({ items, onMovement,
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">Motivo / Ref. (Opcional)</label>
+              <label className="block text-sm font-medium text-slate-700 mb-2">Motivo / Obs (Opcional)</label>
               <input
                 type="text"
                 value={reason}

@@ -1,17 +1,13 @@
-import React, { useState, useEffect, Suspense, lazy } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
-import { DADOS_INICIAIS } from './constants';
+import { DADOS_INICIAIS, CATEGORIAS_DEFAULT } from './constants';
 import { ItemStock, Movimento, TipoMovimento, ViewState, ManualShoppingItem } from './types';
-import { Loader2 } from 'lucide-react';
+import { Dashboard } from './components/Dashboard';
+import { Inventory } from './components/Inventory';
+import { StockMovement } from './components/StockMovement';
+import { History } from './components/History';
+import { ShoppingList } from './components/ShoppingList';
 
-// Lazy load components to fix chunk size warnings and improve initial load
-const Dashboard = lazy(() => import('./components/Dashboard').then(module => ({ default: module.Dashboard })));
-const Inventory = lazy(() => import('./components/Inventory').then(module => ({ default: module.Inventory })));
-const StockMovement = lazy(() => import('./components/StockMovement').then(module => ({ default: module.StockMovement })));
-const History = lazy(() => import('./components/History').then(module => ({ default: module.History })));
-const ShoppingList = lazy(() => import('./components/ShoppingList').then(module => ({ default: module.ShoppingList })));
-
-// Simple ID generator since we can't easily import uuid in this specific env without package.json
 const generateId = () => Math.random().toString(36).substr(2, 9);
 
 export default function App() {
@@ -20,6 +16,7 @@ export default function App() {
   // State
   const [items, setItems] = useState<ItemStock[]>([]);
   const [logs, setLogs] = useState<Movimento[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
   const [manualShoppingList, setManualShoppingList] = useState<ManualShoppingItem[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
 
@@ -27,21 +24,18 @@ export default function App() {
   useEffect(() => {
     const savedItems = localStorage.getItem('it-stock-items');
     const savedLogs = localStorage.getItem('it-stock-logs');
+    const savedCategories = localStorage.getItem('it-stock-categories');
     const savedManual = localStorage.getItem('it-stock-manual-list');
 
-    if (savedItems) {
-      setItems(JSON.parse(savedItems));
-    } else {
-      setItems(DADOS_INICIAIS);
-    }
+    if (savedItems) setItems(JSON.parse(savedItems));
+    else setItems(DADOS_INICIAIS);
 
-    if (savedLogs) {
-      setLogs(JSON.parse(savedLogs));
-    }
+    if (savedLogs) setLogs(JSON.parse(savedLogs));
 
-    if (savedManual) {
-      setManualShoppingList(JSON.parse(savedManual));
-    }
+    if (savedCategories) setCategories(JSON.parse(savedCategories));
+    else setCategories(CATEGORIAS_DEFAULT);
+
+    if (savedManual) setManualShoppingList(JSON.parse(savedManual));
 
     setIsLoaded(true);
   }, []);
@@ -51,11 +45,25 @@ export default function App() {
     if (isLoaded) {
       localStorage.setItem('it-stock-items', JSON.stringify(items));
       localStorage.setItem('it-stock-logs', JSON.stringify(logs));
+      localStorage.setItem('it-stock-categories', JSON.stringify(categories));
       localStorage.setItem('it-stock-manual-list', JSON.stringify(manualShoppingList));
     }
-  }, [items, logs, manualShoppingList, isLoaded]);
+  }, [items, logs, categories, manualShoppingList, isLoaded]);
 
-  // Actions
+  // Category Actions
+  const handleAddCategory = (newCat: string) => {
+    if (!categories.includes(newCat)) {
+      setCategories([...categories, newCat]);
+    }
+  };
+
+  const handleRemoveCategory = (catToRemove: string) => {
+    if (window.confirm(`Tem a certeza que deseja remover a categoria "${catToRemove}"?`)) {
+      setCategories(categories.filter(c => c !== catToRemove));
+    }
+  };
+
+  // Item Actions
   const handleAddItem = (newItemData: Omit<ItemStock, 'id' | 'ultimaAtualizacao'>, motivoInicial?: string) => {
     const newItem: ItemStock = {
       ...newItemData,
@@ -71,8 +79,6 @@ export default function App() {
   };
 
   const handleUpdateItem = (id: string, updates: Partial<ItemStock>) => {
-    // Esta função atualiza o stock SEM gerar um movimento no histórico.
-    // Ideal para correções de contagem.
     setItems(items.map(item => item.id === id ? { ...item, ...updates, ultimaAtualizacao: new Date().toISOString() } : item));
   };
 
@@ -95,7 +101,6 @@ export default function App() {
 
     setItems(items.map(i => i.id === itemId ? { ...i, quantidade: newQuantity, ultimaAtualizacao: new Date().toISOString() } : i));
     
-    // Log with correct sign
     const signedQty = type === TipoMovimento.SAIDA ? -quantity : quantity;
     addLog(itemId, item.nome, type, signedQty, reason);
   };
@@ -113,7 +118,6 @@ export default function App() {
     setLogs(prev => [newLog, ...prev]);
   };
 
-  // Manual Shopping List Actions
   const handleAddManualShoppingItem = (item: Omit<ManualShoppingItem, 'id'>) => {
     setManualShoppingList(prev => [...prev, { ...item, id: generateId() }]);
   };
@@ -130,6 +134,7 @@ export default function App() {
         return <Inventory 
           items={items} 
           logs={logs}
+          categories={categories}
           onAddItem={handleAddItem} 
           onUpdateItem={handleUpdateItem} 
           onDeleteItem={handleDeleteItem}
@@ -137,8 +142,11 @@ export default function App() {
       case 'MOVIMENTOS':
         return <StockMovement 
           items={items} 
+          categories={categories}
           onMovement={handleStockMovement} 
           onAddItem={handleAddItem}
+          onAddCategory={handleAddCategory}
+          onRemoveCategory={handleRemoveCategory}
         />;
       case 'HISTORICO':
         return <History logs={logs} />;
@@ -154,22 +162,12 @@ export default function App() {
     }
   };
 
-  // Loading spinner for Suspense fallback
-  const LoadingState = () => (
-    <div className="flex h-full min-h-[50vh] flex-col items-center justify-center text-slate-400 gap-3">
-      <Loader2 size={40} className="animate-spin text-blue-500" />
-      <span className="text-sm font-medium animate-pulse">A carregar módulo...</span>
-    </div>
-  );
-
   return (
     <div className="flex min-h-screen bg-slate-100 font-sans text-slate-900">
       <Sidebar currentView={currentView} onChangeView={setCurrentView} />
       <main className="ml-64 flex-1 p-8 overflow-y-auto h-screen">
         <div className="max-w-7xl mx-auto animate-in fade-in duration-500">
-          <Suspense fallback={<LoadingState />}>
-            {renderContent()}
-          </Suspense>
+          {renderContent()}
         </div>
       </main>
     </div>

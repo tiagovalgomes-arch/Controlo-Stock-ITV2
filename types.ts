@@ -18,6 +18,7 @@ export interface ItemStock {
   quantidade: number;
   stockMinimo: number;
   localizacao?: string; // Ex: Armário A, Gaveta 2
+  referencia?: string; // Ex: Serial Number, Modelo, Observação
   ultimaAtualizacao: string;
 }
 

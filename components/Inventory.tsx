@@ -1,17 +1,17 @@
 import React, { useState } from 'react';
 import { ItemStock, Categoria, Movimento, TipoMovimento } from '../types';
-import { CATEGORIAS_OPTIONS } from '../constants';
-import { Plus, Search, Edit2, Trash2, Save, X, History as HistoryIcon, ArrowDownLeft, ArrowUpRight, Sliders } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, Save, X, History as HistoryIcon, ArrowDownLeft, ArrowUpRight, Sliders, FileText } from 'lucide-react';
 
 interface InventoryProps {
   items: ItemStock[];
   logs: Movimento[];
+  categories: string[];
   onAddItem: (item: Omit<ItemStock, 'id' | 'ultimaAtualizacao'>, motivo?: string) => void;
   onUpdateItem: (id: string, updates: Partial<ItemStock>) => void;
   onDeleteItem: (id: string) => void;
 }
 
-export const Inventory: React.FC<InventoryProps> = ({ items, logs, onAddItem, onUpdateItem, onDeleteItem }) => {
+export const Inventory: React.FC<InventoryProps> = ({ items, logs, categories, onAddItem, onUpdateItem, onDeleteItem }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState<string>('Todas');
   
@@ -26,15 +26,17 @@ export const Inventory: React.FC<InventoryProps> = ({ items, logs, onAddItem, on
   // Form State
   const [formData, setFormData] = useState({
     nome: '',
-    categoria: CATEGORIAS_OPTIONS[0],
+    categoria: categories[0] || 'Geral',
     quantidade: 0,
     stockMinimo: 5,
-    localizacao: ''
+    localizacao: '',
+    referencia: ''
   });
 
   const filteredItems = items.filter(item => {
     const matchesSearch = item.nome.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          item.localizacao?.toLowerCase().includes(searchTerm.toLowerCase());
+                          item.localizacao?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          item.referencia?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = filterCategory === 'Todas' || item.categoria === filterCategory;
     return matchesSearch && matchesCategory;
   });
@@ -49,19 +51,21 @@ export const Inventory: React.FC<InventoryProps> = ({ items, logs, onAddItem, on
       setEditingItem(item);
       setFormData({
         nome: item.nome,
-        categoria: item.categoria as Categoria,
+        categoria: item.categoria as string,
         quantidade: item.quantidade,
         stockMinimo: item.stockMinimo,
-        localizacao: item.localizacao || ''
+        localizacao: item.localizacao || '',
+        referencia: item.referencia || ''
       });
     } else {
       setEditingItem(null);
       setFormData({
         nome: '',
-        categoria: CATEGORIAS_OPTIONS[0],
+        categoria: categories[0] || 'Geral',
         quantidade: 0,
         stockMinimo: 5,
-        localizacao: ''
+        localizacao: '',
+        referencia: ''
       });
     }
     setIsModalOpen(true);
@@ -114,7 +118,7 @@ export const Inventory: React.FC<InventoryProps> = ({ items, logs, onAddItem, on
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
           <input 
             type="text" 
-            placeholder="Pesquisar por nome, localização..." 
+            placeholder="Pesquisar por nome, localização, referência..." 
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -126,7 +130,7 @@ export const Inventory: React.FC<InventoryProps> = ({ items, logs, onAddItem, on
           className="px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
         >
           <option value="Todas">Todas as Categorias</option>
-          {CATEGORIAS_OPTIONS.map(cat => (
+          {categories.map(cat => (
             <option key={cat} value={cat}>{cat}</option>
           ))}
         </select>
@@ -142,6 +146,7 @@ export const Inventory: React.FC<InventoryProps> = ({ items, logs, onAddItem, on
                 <th className="px-6 py-4 font-semibold text-slate-600 text-sm">Categoria</th>
                 <th className="px-6 py-4 font-semibold text-slate-600 text-sm text-center">Stock Atual</th>
                 <th className="px-6 py-4 font-semibold text-slate-600 text-sm">Localização</th>
+                <th className="px-6 py-4 font-semibold text-slate-600 text-sm">Ref / Obs</th>
                 <th className="px-6 py-4 font-semibold text-slate-600 text-sm text-right">Ações</th>
               </tr>
             </thead>
@@ -174,6 +179,14 @@ export const Inventory: React.FC<InventoryProps> = ({ items, logs, onAddItem, on
                     <td className="px-6 py-4 text-sm text-slate-500">
                       {item.localizacao || '-'}
                     </td>
+                    <td className="px-6 py-4 text-sm text-slate-500 max-w-xs truncate">
+                      {item.referencia ? (
+                        <span className="flex items-center gap-1 text-slate-600">
+                           <FileText size={14} className="text-slate-400" />
+                           {item.referencia}
+                        </span>
+                      ) : '-'}
+                    </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
                         <button 
@@ -204,8 +217,8 @@ export const Inventory: React.FC<InventoryProps> = ({ items, logs, onAddItem, on
               })}
               {filteredItems.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-6 py-10 text-center text-slate-400">
-                    Nenhum item encontrado. Adicione novos itens para começar.
+                  <td colSpan={6} className="px-6 py-10 text-center text-slate-400">
+                    Nenhum item encontrado.
                   </td>
                 </tr>
               )}
@@ -243,10 +256,10 @@ export const Inventory: React.FC<InventoryProps> = ({ items, logs, onAddItem, on
                 <label className="block text-sm font-medium text-slate-700 mb-1">Categoria</label>
                 <select 
                   value={formData.categoria}
-                  onChange={e => setFormData({...formData, categoria: e.target.value as Categoria})}
+                  onChange={e => setFormData({...formData, categoria: e.target.value})}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                 >
-                  {CATEGORIAS_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                  {categories.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                 </select>
               </div>
 
@@ -268,7 +281,7 @@ export const Inventory: React.FC<InventoryProps> = ({ items, logs, onAddItem, on
                   </p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Stock Mínimo (Alerta)</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Stock Mínimo</label>
                   <input 
                     type="number" 
                     min="0"
@@ -287,6 +300,17 @@ export const Inventory: React.FC<InventoryProps> = ({ items, logs, onAddItem, on
                   onChange={e => setFormData({...formData, localizacao: e.target.value})}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                   placeholder="Ex: Armário B, Prateleira 2"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Referência / Observações (Opcional)</label>
+                <input 
+                  type="text" 
+                  value={formData.referencia}
+                  onChange={e => setFormData({...formData, referencia: e.target.value})}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                  placeholder="Ex: S/N 12345, Modelo X1"
                 />
               </div>
 
@@ -311,10 +335,10 @@ export const Inventory: React.FC<InventoryProps> = ({ items, logs, onAddItem, on
         </div>
       )}
 
-      {/* Modal Item History */}
+      {/* Modal Item History - reused with minor layout check */}
       {isHistoryModalOpen && historyItem && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[80vh]">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[80vh]">
             <div className="bg-slate-50 px-6 py-4 border-b border-slate-200 flex justify-between items-center shrink-0">
               <div>
                 <h3 className="font-bold text-lg text-slate-800">Histórico de Movimentos</h3>
@@ -378,12 +402,8 @@ export const Inventory: React.FC<InventoryProps> = ({ items, logs, onAddItem, on
                 </table>
               )}
             </div>
-
             <div className="p-4 bg-slate-50 border-t border-slate-200 shrink-0 text-right">
-              <button 
-                onClick={() => setIsHistoryModalOpen(false)}
-                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg font-medium transition-colors"
-              >
+              <button onClick={() => setIsHistoryModalOpen(false)} className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg font-medium">
                 Fechar
               </button>
             </div>
